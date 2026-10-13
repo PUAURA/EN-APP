@@ -6,6 +6,7 @@ import {
   useReducer,
   useRef,
 } from 'react'
+import { WORDS } from '../data/words'
 import { rateWord as srsRate, recordQuiz as srsQuiz } from '../lib/srs'
 import { todayKey } from '../lib/format'
 
@@ -16,21 +17,33 @@ const DEFAULT_STATE = {
   settings: { dailyNew: 10, dailyGoal: 20 },
   activity: {}, // dateKey -> [unique word ids studied that day]
   quizHistory: [], // [{ date, mode, total, correct }]
+  customWords: [], // imported vocabulary, tag: 'custom'
+}
+
+function freshDefault() {
+  return {
+    progress: {},
+    settings: { ...DEFAULT_STATE.settings },
+    activity: {},
+    quizHistory: [],
+    customWords: [],
+  }
 }
 
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return DEFAULT_STATE
+    if (!raw) return freshDefault()
     const parsed = JSON.parse(raw)
     return {
       progress: parsed.progress || {},
       settings: { ...DEFAULT_STATE.settings, ...(parsed.settings || {}) },
       activity: parsed.activity || {},
       quizHistory: Array.isArray(parsed.quizHistory) ? parsed.quizHistory : [],
+      customWords: Array.isArray(parsed.customWords) ? parsed.customWords : [],
     }
   } catch {
-    return DEFAULT_STATE
+    return freshDefault()
   }
 }
 
@@ -69,8 +82,25 @@ function reducer(state, action) {
       }
     case 'setSetting':
       return { ...state, settings: { ...state.settings, [action.key]: action.value } }
+    case 'addCustomWords':
+      return { ...state, customWords: [...state.customWords, ...action.words] }
+    case 'removeCustomWord': {
+      const progress = { ...state.progress }
+      delete progress[action.id]
+      return {
+        ...state,
+        progress,
+        customWords: state.customWords.filter((w) => w.id !== action.id),
+      }
+    }
+    case 'clearCustomWords': {
+      const progress = { ...state.progress }
+      for (const w of state.customWords) delete progress[w.id]
+      return { ...state, progress, customWords: [] }
+    }
     case 'reset':
-      return { ...DEFAULT_STATE }
+      // Reset progress/settings but keep the user's imported vocabulary.
+      return { ...freshDefault(), customWords: state.customWords }
     default:
       return state
   }
@@ -97,10 +127,14 @@ export function AppProvider({ children }) {
   const value = useMemo(
     () => ({
       state,
+      words: [...WORDS, ...state.customWords],
       rateWord: (wordId, rating) => dispatch({ type: 'rate', wordId, rating }),
       quizResult: (wordId, correct) => dispatch({ type: 'quizResult', wordId, correct }),
       saveQuizSession: (session) => dispatch({ type: 'quizSession', session }),
       setSetting: (key, value) => dispatch({ type: 'setSetting', key, value }),
+      addCustomWords: (words) => dispatch({ type: 'addCustomWords', words }),
+      removeCustomWord: (id) => dispatch({ type: 'removeCustomWord', id }),
+      clearCustomWords: () => dispatch({ type: 'clearCustomWords' }),
       resetAll: () => dispatch({ type: 'reset' }),
     }),
     [state],
@@ -113,4 +147,9 @@ export function useApp() {
   const ctx = useContext(AppContext)
   if (!ctx) throw new Error('useApp must be used inside <AppProvider>')
   return ctx
+}
+
+// The active vocabulary: built-in words followed by imported ones.
+export function useWords() {
+  return useApp().words
 }

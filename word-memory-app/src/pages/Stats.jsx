@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useApp } from '../store/AppStore'
 import {
   computeCounts,
@@ -23,13 +24,13 @@ const MODE_LABEL = { en2cn: '英译中', cn2en: '中译英', spell: '拼写' }
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n || 0))
 
 export default function Stats() {
-  const { state, setSetting, resetAll } = useApp()
+  const { state, setSetting, resetAll, words } = useApp()
   const { progress, activity, settings, quizHistory } = state
 
-  const counts = computeCounts(progress)
+  const counts = computeCounts(words, progress)
   const streak = getStreak(activity)
   const today = todayCount(activity)
-  const mistakeCount = getMistakeWords(progress).length
+  const mistakeCount = getMistakeWords(words, progress).length
   const total = counts.total || 1
 
   const week = getActivitySeries(activity, 7)
@@ -38,7 +39,7 @@ export default function Stats() {
   const heat = getActivitySeries(activity, 84)
   const maxHeat = Math.max(1, ...heat.map((d) => d.count))
 
-  const forecast = getForecast(progress, 7)
+  const forecast = getForecast(words, progress, 7)
   const maxForecast = Math.max(1, ...forecast.map((f) => f.count))
 
   const stack = [
@@ -79,7 +80,12 @@ export default function Stats() {
         <StatCard icon={<IconLayers size={18} />} label="学习中" value={counts.learning} />
         <StatCard icon={<IconChart size={18} />} label="未学习" value={counts.newCount} />
         <StatCard icon={<IconClock size={18} />} label="今日已学" value={today} />
-        <StatCard icon={<IconAlert size={18} />} label="错词本" value={mistakeCount} />
+        <StatCard
+          icon={<IconAlert size={18} />}
+          label="错词本"
+          value={mistakeCount}
+          to={mistakeCount > 0 ? '/study?mode=mistake' : undefined}
+        />
       </div>
 
       <div className="grid-2">
@@ -225,14 +231,22 @@ export default function Stats() {
   )
 }
 
-function StatCard({ icon, label, value }) {
-  return (
-    <div className="stat">
+function StatCard({ icon, label, value, to }) {
+  const body = (
+    <>
       <div className="top">
         <span className="ico">{icon}</span>
         {label}
       </div>
       <div className="val tnum">{value}</div>
-    </div>
+    </>
   )
+  if (to) {
+    return (
+      <Link className="stat stat-link" to={to}>
+        {body}
+      </Link>
+    )
+  }
+  return <div className="stat">{body}</div>
 }

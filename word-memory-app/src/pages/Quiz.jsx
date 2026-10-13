@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApp } from '../store/AppStore'
-import { WORDS, TAGS } from '../data/words'
+import { TAGS } from '../data/words'
 import { IconList, IconText, IconPencil, IconCheck, IconX, IconTrophy, IconArrowRight } from '../components/Icons'
 
 const MODES = [
@@ -34,15 +34,17 @@ function shuffle(arr) {
   return a
 }
 
-function buildQuestions(mode, progress, count = 10) {
-  const learned = WORDS.filter((w) => progress[w.id] && progress[w.id].reps > 0)
-  const pool = learned.length >= 6 ? learned : WORDS
+function buildQuestions(mode, words, progress, count = 10) {
+  const learned = words.filter((w) => progress[w.id] && progress[w.id].reps > 0)
+  const pool = learned.length >= 6 ? learned : words
   return shuffle(pool)
     .slice(0, Math.min(count, pool.length))
     .map((w) => {
       if (mode === 'spell') return { word: w, type: 'spell' }
       const field = mode === 'en2cn' ? 'cn' : 'word'
-      const others = shuffle(WORDS.filter((x) => x.id !== w.id)).slice(0, 3)
+      const others = shuffle(
+        words.filter((x) => x.id !== w.id && x[field] !== w[field]),
+      ).slice(0, 3)
       const options = shuffle([w, ...others]).map((o) => ({
         text: o[field],
         correct: o.id === w.id,
@@ -52,7 +54,7 @@ function buildQuestions(mode, progress, count = 10) {
 }
 
 export default function Quiz() {
-  const { state, quizResult, saveQuizSession } = useApp()
+  const { state, quizResult, saveQuizSession, words } = useApp()
   const { progress } = state
 
   const [phase, setPhase] = useState('setup')
@@ -69,7 +71,7 @@ export default function Quiz() {
 
   const start = (m) => {
     setMode(m)
-    setQuestions(buildQuestions(m, progress))
+    setQuestions(buildQuestions(m, words, progress))
     setIndex(0)
     setSelected(null)
     setInput('')

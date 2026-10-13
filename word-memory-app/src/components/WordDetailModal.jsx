@@ -9,7 +9,7 @@ const STATUS_CLASS = {
   mastered: 'badge mastered',
 }
 
-export default function WordDetailModal({ word, progress, onClose }) {
+export default function WordDetailModal({ word, progress, onClose, onDelete }) {
   if (!word) return null
   const status = getStatus(progress)
   const p = progress || {}
@@ -64,6 +64,12 @@ export default function WordDetailModal({ word, progress, onClose }) {
             </div>
           </div>
         </div>
+
+        {onDelete && (
+          <button className="btn danger block" style={{ marginTop: 18 }} onClick={onDelete}>
+            删除该自定义单词
+          </button>
+        )}
       </div>
     </div>
   )

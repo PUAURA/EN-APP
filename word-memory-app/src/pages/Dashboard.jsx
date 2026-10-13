@@ -23,15 +23,15 @@ import {
 } from '../components/Icons'
 
 export default function Dashboard() {
-  const { state } = useApp()
+  const { state, words } = useApp()
   const { progress, activity, settings } = state
   const [selected, setSelected] = useState(null)
 
   const now = Date.now()
-  const counts = computeCounts(progress, now)
-  const due = getDueWords(progress, now)
-  const fresh = getNewWords(progress)
-  const mistakes = getMistakeWords(progress)
+  const counts = computeCounts(words, progress, now)
+  const due = getDueWords(words, progress, now)
+  const fresh = getNewWords(words, progress)
+  const mistakes = getMistakeWords(words, progress)
   const streak = getStreak(activity)
   const doneToday = todayCount(activity)
 
@@ -86,6 +86,12 @@ export default function Dashboard() {
               <IconTarget size={18} />
               开始测试
             </Link>
+            {mistakes.length > 0 && (
+              <Link className="btn ghost lg" to="/study?mode=mistake">
+                <IconAlert size={18} />
+                错词专项
+              </Link>
+            )}
           </div>
         </div>
       </section>
@@ -94,7 +100,13 @@ export default function Dashboard() {
         <MiniStat icon={<IconClock size={18} />} label="今日待复习" value={due.length} unit="词" />
         <MiniStat icon={<IconLayers size={18} />} label="新词可学" value={newToLearn} unit="词" />
         <MiniStat icon={<IconTrophy size={18} />} label="已掌握" value={counts.mastered} unit="词" />
-        <MiniStat icon={<IconAlert size={18} />} label="错词本" value={mistakes.length} unit="词" />
+        <MiniStat
+          icon={<IconAlert size={18} />}
+          label="错词本"
+          value={mistakes.length}
+          unit="词"
+          to={mistakes.length > 0 ? '/study?mode=mistake' : undefined}
+        />
       </div>
 
       <div className="dash-cols">
@@ -182,9 +194,9 @@ export default function Dashboard() {
   )
 }
 
-function MiniStat({ icon, label, value, unit }) {
-  return (
-    <div className="stat">
+function MiniStat({ icon, label, value, unit, to }) {
+  const body = (
+    <>
       <div className="top">
         <span className="ico">{icon}</span>
         {label}
@@ -193,6 +205,14 @@ function MiniStat({ icon, label, value, unit }) {
         {value}
         <small>{unit}</small>
       </div>
-    </div>
+    </>
   )
+  if (to) {
+    return (
+      <Link className="stat stat-link" to={to}>
+        {body}
+      </Link>
+    )
+  }
+  return <div className="stat">{body}</div>
 }

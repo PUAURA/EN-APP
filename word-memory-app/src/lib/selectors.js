@@ -1,14 +1,15 @@
-// Pure selectors over the persisted progress map. No React here.
-import { WORDS } from '../data/words'
+// Pure selectors over a word list + the persisted progress map. No React here.
+// Every selector takes the active word list (built-in + imported) as its first
+// argument so custom vocabulary is included everywhere.
 import { getStatus, isDue, MASTERED_STAGE } from './srs'
 import { dateKey, shiftDayKey, todayKey } from './format'
 
-export function computeCounts(progress, now = Date.now()) {
+export function computeCounts(words, progress, now = Date.now()) {
   let mastered = 0
   let learning = 0
   let fresh = 0
   let due = 0
-  for (const w of WORDS) {
+  for (const w of words) {
     const p = progress[w.id]
     const s = getStatus(p)
     if (s === 'mastered') mastered++
@@ -16,25 +17,28 @@ export function computeCounts(progress, now = Date.now()) {
     else fresh++
     if (isDue(p, now)) due++
   }
-  return { total: WORDS.length, mastered, learning, newCount: fresh, due }
+  return { total: words.length, mastered, learning, newCount: fresh, due }
 }
 
-export function getDueWords(progress, now = Date.now()) {
-  return WORDS.filter((w) => isDue(progress[w.id], now)).sort(
-    (a, b) => progress[a.id].due - progress[b.id].due,
-  )
+export function getDueWords(words, progress, now = Date.now()) {
+  return words
+    .filter((w) => isDue(progress[w.id], now))
+    .sort((a, b) => progress[a.id].due - progress[b.id].due)
 }
 
-export function getNewWords(progress) {
-  return WORDS.filter((w) => !progress[w.id] || !progress[w.id].reps)
+export function getNewWords(words, progress) {
+  return words.filter((w) => !progress[w.id] || !progress[w.id].reps)
 }
 
-export function getLearnedWords(progress) {
-  return WORDS.filter((w) => progress[w.id] && progress[w.id].reps > 0)
+export function getLearnedWords(words, progress) {
+  return words.filter((w) => progress[w.id] && progress[w.id].reps > 0)
 }
 
-export function getMistakeWords(progress) {
-  return WORDS.filter((w) => progress[w.id] && progress[w.id].inMistakes)
+// Mistake-book words, most-lapsed first (hardest to remember first).
+export function getMistakeWords(words, progress) {
+  return words
+    .filter((w) => progress[w.id] && progress[w.id].inMistakes)
+    .sort((a, b) => (progress[b.id].lapses || 0) - (progress[a.id].lapses || 0))
 }
 
 // activity[date] holds the unique ids of words studied that day.
@@ -72,12 +76,12 @@ export function todayCount(activity) {
 }
 
 // How many words fall due on each of the next `days` days.
-export function getForecast(progress, days, now = Date.now()) {
+export function getForecast(words, progress, days, now = Date.now()) {
   const buckets = []
   for (let i = 0; i < days; i++) {
     buckets.push({ key: dateKey(now + i * 86400000), count: 0 })
   }
-  for (const w of WORDS) {
+  for (const w of words) {
     const p = progress[w.id]
     if (!p || p.stage < 1) continue
     const diffDays = Math.floor((p.due - now) / 86400000)

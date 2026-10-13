@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useApp } from '../store/AppStore'
-import { WORDS } from '../data/words'
 import { getStatus, STATUS_LABEL, MASTERED_STAGE } from '../lib/srs'
 import { computeCounts, getMistakeWords } from '../lib/selectors'
 import WordDetailModal from '../components/WordDetailModal'
-import { IconSearch } from '../components/Icons'
+import ImportWordsModal from '../components/ImportWordsModal'
+import { IconSearch, IconAlert } from '../components/Icons'
 
 const FILTERS = [
   { key: 'all', label: '全部' },
@@ -12,6 +13,7 @@ const FILTERS = [
   { key: 'learning', label: '学习中' },
   { key: 'mastered', label: '已掌握' },
   { key: 'mistake', label: '错词本' },
+  { key: 'custom', label: '自定义' },
 ]
 
 const STATUS_CLASS = {
@@ -21,35 +23,45 @@ const STATUS_CLASS = {
 }
 
 export default function Wordbook() {
-  const { state } = useApp()
-  const { progress } = state
+  const { state, words, addCustomWords, removeCustomWord, clearCustomWords } = useApp()
+  const { progress, customWords } = state
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState('all')
   const [selected, setSelected] = useState(null)
+  const [importing, setImporting] = useState(false)
 
-  const counts = computeCounts(progress)
-  const mistakeCount = getMistakeWords(progress).length
+  const counts = computeCounts(words, progress)
+  const mistakeCount = getMistakeWords(words, progress).length
   const filterCounts = {
-    all: WORDS.length,
+    all: words.length,
     new: counts.newCount,
     learning: counts.learning,
     mastered: counts.mastered,
     mistake: mistakeCount,
+    custom: customWords.length,
   }
 
   const term = q.trim().toLowerCase()
-  const list = WORDS.filter((w) => {
+  const list = words.filter((w) => {
     const p = progress[w.id]
     const status = getStatus(p)
     if (filter === 'new' && status !== 'new') return false
     if (filter === 'learning' && status !== 'learning') return false
     if (filter === 'mastered' && status !== 'mastered') return false
     if (filter === 'mistake' && !(p && p.inMistakes)) return false
+    if (filter === 'custom' && w.tag !== 'custom') return false
     if (term && !w.word.toLowerCase().includes(term) && !w.cn.includes(q.trim())) return false
     return true
   })
 
   const activeLabel = FILTERS.find((f) => f.key === filter).label
+
+  const onClearCustom = () => {
+    if (window.confirm(`确定要清空全部 ${customWords.length} 个自定义单词吗？`)) {
+      clearCustomWords()
+      setImporting(false)
+    }
+  }
 
   return (
     <div className="page">
@@ -57,9 +69,13 @@ export default function Wordbook() {
         <div>
           <h1 className="page-title">单词本</h1>
           <div className="page-sub">
-            共 {WORDS.length} 个单词 · 已掌握 {counts.mastered} · 错词 {mistakeCount}
+            共 {words.length} 个单词 · 已掌握 {counts.mastered} · 错词 {mistakeCount}
+            {customWords.length > 0 ? ` · 自定义 ${customWords.length}` : ''}
           </div>
         </div>
+        <button className="btn primary" onClick={() => setImporting(true)}>
+          导入自定义词库
+        </button>
       </div>
 
       <div className="wb-toolbar">
@@ -89,6 +105,20 @@ export default function Wordbook() {
         ))}
       </div>
 
+      {filter === 'mistake' && mistakeCount > 0 && (
+        <div className="review-banner">
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>错词专项复习</div>
+            <div className="muted" style={{ fontSize: 13 }}>
+              把这 {mistakeCount} 个易错词单独过一遍，掌握后自动移出错词本
+            </div>
+          </div>
+          <Link className="btn primary" to="/study?mode=mistake">
+            <IconAlert size={16} /> 开始复习
+          </Link>
+        </div>
+      )}
+
       {list.length === 0 ? (
         <div className="card">
           <div className="empty">
@@ -96,7 +126,11 @@ export default function Wordbook() {
               <IconSearch size={24} />
             </div>
             <h3>没有找到匹配的单词</h3>
-            <p>换个关键词，或切换其他筛选条件试试。</p>
+            <p>
+              {filter === 'custom'
+                ? '还没有导入自定义单词，点击右上角「导入自定义词库」试试。'
+                : '换个关键词，或切换其他筛选条件试试。'}
+            </p>
           </div>
         </div>
       ) : (
@@ -114,7 +148,10 @@ export default function Wordbook() {
             return (
               <div key={w.id} className="wb-row" onClick={() => setSelected(w)}>
                 <div style={{ minWidth: 0 }}>
-                  <div className="wb-w">{w.word}</div>
+                  <div className="wb-w">
+                    {w.word}
+                    {w.tag === 'custom' && <span className="badge tag" style={{ marginLeft: 8 }}>自定义</span>}
+                  </div>
                   <div className="wb-ph">{w.phonetic}</div>
                 </div>
                 <div className="wb-cn">{w.cn}</div>
@@ -146,6 +183,24 @@ export default function Wordbook() {
           word={selected}
           progress={progress[selected.id]}
           onClose={() => setSelected(null)}
+          onDelete={
+            selected.tag === 'custom'
+              ? () => {
+                  removeCustomWord(selected.id)
+                  setSelected(null)
+                }
+              : undefined
+          }
+        />
+      )}
+
+      {importing && (
+        <ImportWordsModal
+          existing={words}
+          customCount={customWords.length}
+          onImport={addCustomWords}
+          onClear={onClearCustom}
+          onClose={() => setImporting(false)}
         />
       )}
     </div>

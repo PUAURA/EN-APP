@@ -5,6 +5,7 @@ export const TAGS = {
   cet4: '四级',
   cet6: '六级',
   kaoyan: '考研',
+  custom: '自定义',
 }
 
 export const WORDS = [
